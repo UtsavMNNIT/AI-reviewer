@@ -47,6 +47,13 @@
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
 
+		<!-- Apache PDFBox (PDF text extraction) -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.4</version>
+		</dependency>
+
 		<!-- JWT (jjwt) -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
