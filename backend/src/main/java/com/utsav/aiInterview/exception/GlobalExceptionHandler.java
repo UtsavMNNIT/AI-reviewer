@@ -59,6 +59,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(false, "Failed to process file", null));
     }
 
+    @ExceptionHandler(AIServiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiService(AIServiceException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(new ApiResponse<>(false, ex.getMessage(), null));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
