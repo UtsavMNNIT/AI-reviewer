@@ -29,6 +29,7 @@ export interface InterviewResponse {
 
 /** Request body for POST /api/interviews. */
 export interface CreateInterviewRequest {
+  resumeId: string
   role: string
   difficulty: Difficulty
 }

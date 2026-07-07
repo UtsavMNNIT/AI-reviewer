@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
 import SearchableSelect from '../components/ui/SearchableSelect'
 import { createInterview } from '../services/interviewService'
 import { getRoles } from '../services/roleService'
+import { getResumes } from '../services/resumeService'
 import { getErrorMessage } from '../utils/errors'
 import type { Difficulty } from '../types/interview'
 
@@ -16,6 +17,7 @@ const DIFFICULTIES: Difficulty[] = ['EASY', 'MEDIUM', 'HARD']
 export default function InterviewsPage() {
   const navigate = useNavigate()
   const [role, setRole] = useState('')
+  const [resumeId, setResumeId] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM')
 
   const {
@@ -24,20 +26,49 @@ export default function InterviewsPage() {
     isError: rolesError,
   } = useQuery({ queryKey: ['roles'], queryFn: getRoles })
 
+  const {
+    data: resumes,
+    isLoading: resumesLoading,
+    isError: resumesError,
+  } = useQuery({ queryKey: ['resumes'], queryFn: getResumes })
+
+  // Newest first — drives both the dropdown order and the default selection.
+  const sortedResumes = useMemo(
+    () =>
+      [...(resumes ?? [])].sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      ),
+    [resumes],
+  )
+
+  // Pre-select the most recent resume once the list loads.
+  useEffect(() => {
+    if (!resumeId && sortedResumes.length > 0) {
+      setResumeId(sortedResumes[0].id)
+    }
+  }, [resumeId, sortedResumes])
+
   const mutation = useMutation({
-    mutationFn: () => createInterview({ role, difficulty }),
+    mutationFn: () => createInterview({ resumeId, role, difficulty }),
     onSuccess: (data) => navigate(`/interviews/${data.id}`),
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!resumeId) {
+      toast.error('Please choose a resume')
+      return
+    }
     if (!role) {
       toast.error('Please choose a role')
       return
     }
     mutation.mutate()
   }
+
+  const hasResumes = sortedResumes.length > 0
 
   return (
     <motion.div
@@ -52,12 +83,54 @@ export default function InterviewsPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">Start an interview</h1>
           <p className="text-sm text-slate-400">
-            Choose the role you want to interview for.
+            Pick a resume and the role you want to interview for.
           </p>
         </div>
       </div>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
+        <div className="flex flex-col gap-1 text-left">
+          <label htmlFor="resume" className="text-sm font-medium text-slate-300">
+            Resume
+          </label>
+          {resumesLoading && (
+            <p className="text-sm text-slate-500">Loading resumes…</p>
+          )}
+          {resumesError && (
+            <p className="text-sm text-red-400">
+              Couldn&apos;t load your resumes. Please try again later.
+            </p>
+          )}
+          {!resumesLoading && !resumesError && !hasResumes && (
+            <p className="text-sm text-slate-400">
+              You haven&apos;t uploaded a resume yet.{' '}
+              <Link
+                to="/resumes"
+                className="font-medium text-brand-400 hover:underline"
+              >
+                Upload one first
+              </Link>{' '}
+              to start an interview.
+            </p>
+          )}
+          {!resumesLoading && !resumesError && hasResumes && (
+            <select
+              id="resume"
+              value={resumeId}
+              onChange={(e) => setResumeId(e.target.value)}
+              disabled={mutation.isPending}
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+            >
+              {sortedResumes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.originalFilename} —{' '}
+                  {new Date(r.uploadedAt).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         <div className="flex flex-col gap-1 text-left">
           <label htmlFor="role" className="text-sm font-medium text-slate-300">
             Role
@@ -102,7 +175,11 @@ export default function InterviewsPage() {
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" loading={mutation.isPending} disabled={!role}>
+          <Button
+            type="submit"
+            loading={mutation.isPending}
+            disabled={!role || !resumeId}
+          >
             Start interview
           </Button>
         </div>
