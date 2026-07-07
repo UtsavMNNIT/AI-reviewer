@@ -10,6 +10,7 @@ import type { LoginRequest, RegisterRequest, Role } from '../types/auth'
 
 interface AuthContextValue {
   email: string | null
+  name: string | null
   role: Role | null
   isAuthenticated: boolean
   isLoading: boolean
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const email = useAuthStore((s) => s.email)
+  const name = useAuthStore((s) => s.name)
   const role = useAuthStore((s) => s.role)
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   const setSession = useAuthStore((s) => s.setSession)
@@ -61,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextValue = {
     email,
+    name,
     role,
     isAuthenticated,
     isLoading: loginMutation.isPending || registerMutation.isPending,

@@ -8,6 +8,7 @@ export interface AuthResponse {
   refreshToken: string
   tokenType: string
   email: string
+  name: string
   role: string
 }
 

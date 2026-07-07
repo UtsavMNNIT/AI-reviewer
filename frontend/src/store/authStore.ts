@@ -6,6 +6,7 @@ interface AuthState {
   accessToken: string | null
   refreshToken: string | null
   email: string | null
+  name: string | null
   role: Role | null
   isAuthenticated: boolean
   setSession: (res: AuthResponse) => void
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       email: null,
+      name: null,
       role: null,
       isAuthenticated: false,
       setSession: (res) =>
@@ -29,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: res.accessToken,
           refreshToken: res.refreshToken,
           email: res.email,
+          name: res.name,
           role: res.role as Role,
           isAuthenticated: true,
         }),
@@ -37,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           email: null,
+          name: null,
           role: null,
           isAuthenticated: false,
         }),

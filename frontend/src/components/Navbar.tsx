@@ -7,7 +7,7 @@ interface Props {
 }
 
 export default function Navbar({ onMenuClick }: Props) {
-  const { email, role, logout } = useAuth()
+  const { email, name, role, logout } = useAuth()
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-900/80 px-4 py-3 backdrop-blur sm:px-6">
@@ -24,7 +24,7 @@ export default function Navbar({ onMenuClick }: Props) {
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-2 text-sm text-slate-300">
           <UserCircle size={18} className="text-brand-400" />
-          <span className="hidden sm:inline">{email}</span>
+          <span className="hidden sm:inline">{name ?? email}</span>
           {role && (
             <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
               {role}
