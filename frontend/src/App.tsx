@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import InterviewsPage from './pages/InterviewsPage'
 import InterviewSessionPage from './pages/InterviewSessionPage'
+import CodingRoundPage from './pages/CodingRoundPage'
 import ResumeUploadPage from './pages/ResumeUploadPage'
 import ResultsPage from './pages/ResultsPage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/resumes" element={<ResumeUploadPage />} />
               <Route path="/interviews" element={<InterviewsPage />} />
               <Route path="/interviews/:id" element={<InterviewSessionPage />} />
+              <Route path="/coding" element={<CodingRoundPage />} />
               <Route path="/results" element={<ResultsPage />} />
             </Route>
           </Route>

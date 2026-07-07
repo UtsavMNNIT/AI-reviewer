@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -37,7 +37,6 @@ export default function InterviewSessionPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   // Client-side only — the backend has no answer-submission endpoint.
   const [answers, setAnswers] = useState<Record<number, string>>({})
-  const [transcripts, setTranscripts] = useState<Record<number, string>>({})
   const [elapsed, setElapsed] = useState(0)
   const [camError, setCamError] = useState(false)
   const startedRef = useRef(false)
@@ -87,7 +86,8 @@ export default function InterviewSessionPage() {
   const speech = useSpeechRecognition({
     onFinalResult: (text) => {
       if (!text) return
-      setTranscripts((prev) => {
+    
+      setAnswers((prev) => {
         const existing = prev[currentIndex] ?? ''
         return { ...prev, [currentIndex]: existing ? `${existing} ${text}` : text }
       })
@@ -98,12 +98,6 @@ export default function InterviewSessionPage() {
   const total = questions.length
   const isLast = currentIndex === total - 1
   const current = questions[currentIndex]
-
-  const liveTranscript = useMemo(() => {
-    const finalized = transcripts[currentIndex] ?? ''
-    if (!speech.interim) return finalized
-    return finalized ? `${finalized} ${speech.interim}` : speech.interim
-  }, [transcripts, currentIndex, speech.interim])
 
   if (isLoading) {
     return (
@@ -157,7 +151,7 @@ export default function InterviewSessionPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.2fr]">
-        {/* Left column: webcam + transcript */}
+        {/* Left column: webcam */}
         <div className="flex flex-col gap-6">
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
             <div className="aspect-video w-full bg-slate-950">
@@ -179,12 +173,29 @@ export default function InterviewSessionPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Right column: question + answer + nav */}
+        <div className="flex flex-col gap-6">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            {current?.topic && (
+              <span className="inline-block rounded-full bg-brand-600/15 px-3 py-1 text-xs font-medium text-brand-300">
+                {current.topic}
+              </span>
+            )}
+            <p className="mt-3 text-lg font-medium leading-relaxed text-white">
+              {current?.question ?? 'No question available.'}
+            </p>
+          </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
-                Speech transcript
-              </h2>
+            <div className="mb-2 flex items-center justify-between">
+              <label
+                htmlFor="answer"
+                className="block text-sm font-semibold text-white"
+              >
+                Your answer
+              </label>
               {speech.supported ? (
                 <Button
                   variant="ghost"
@@ -207,47 +218,20 @@ export default function InterviewSessionPage() {
                 </span>
               )}
             </div>
-            <div className="min-h-24 rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm text-slate-300">
-              {liveTranscript || (
-                <span className="text-slate-600">
-                  {speech.supported
-                    ? 'Press Record and start speaking — your words will appear here.'
-                    : 'Speech-to-text is only available in Chrome or Edge.'}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right column: question + answer + nav */}
-        <div className="flex flex-col gap-6">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            {current?.topic && (
-              <span className="inline-block rounded-full bg-brand-600/15 px-3 py-1 text-xs font-medium text-brand-300">
-                {current.topic}
-              </span>
-            )}
-            <p className="mt-3 text-lg font-medium leading-relaxed text-white">
-              {current?.question ?? 'No question available.'}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <label
-              htmlFor="answer"
-              className="mb-2 block text-sm font-semibold text-white"
-            >
-              Your answer
-            </label>
             <textarea
               id="answer"
               value={answers[currentIndex] ?? ''}
               onChange={(e) =>
                 setAnswers((prev) => ({ ...prev, [currentIndex]: e.target.value }))
               }
-              placeholder="Type your answer, or use the transcript above as a starting point…"
+              placeholder="Type your answer, or press Record and speak…"
               className="h-48 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
             />
+            {speech.listening && speech.interim && (
+              <p className="mt-2 text-xs italic text-slate-500">
+                {speech.interim}…
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
