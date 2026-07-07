@@ -28,6 +28,8 @@ public class Interview {
     @Indexed
     private String userEmail;
 
+    private String resumeId;
+
     private String role;
 
     private Difficulty difficulty;

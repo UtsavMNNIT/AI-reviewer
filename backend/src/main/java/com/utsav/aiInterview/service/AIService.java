@@ -68,9 +68,10 @@ public class AIService {
     }
 
     /**
-     * Generates a set of interview questions for the given role and difficulty via Gemini.
+     * Generates interview questions tailored to the candidate's resume, the target role
+     * and the chosen difficulty via Gemini.
      */
-    public GeneratedQuestions generateInterviewQuestions(String role, Difficulty difficulty) {
+    public GeneratedQuestions generateInterviewQuestions(String resumeText, String role, Difficulty difficulty) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new BadRequestException("Gemini API key is not configured");
         }
@@ -82,7 +83,7 @@ public class AIService {
         headers.set(API_KEY_HEADER, apiKey);
 
         HttpEntity<Map<String, Object>> entity =
-                new HttpEntity<>(buildInterviewRequest(role, difficulty), headers);
+                new HttpEntity<>(buildInterviewRequest(resumeText, role, difficulty), headers);
 
         String response;
         try {
@@ -135,8 +136,8 @@ public class AIService {
                 """ + resumeText;
     }
 
-    private Map<String, Object> buildInterviewRequest(String role, Difficulty difficulty) {
-        Map<String, Object> textPart = Map.of("text", buildInterviewPrompt(role, difficulty));
+    private Map<String, Object> buildInterviewRequest(String resumeText, String role, Difficulty difficulty) {
+        Map<String, Object> textPart = Map.of("text", buildInterviewPrompt(resumeText, role, difficulty));
         Map<String, Object> content = Map.of("parts", List.of(textPart));
 
         Map<String, Object> questionItem = Map.of(
@@ -158,11 +159,12 @@ public class AIService {
                 "generationConfig", generationConfig);
     }
 
-    private String buildInterviewPrompt(String role, Difficulty difficulty) {
+    private String buildInterviewPrompt(String resumeText, String role, Difficulty difficulty) {
         return """
                 You are an expert technical interviewer.
-                Generate exactly 8 interview questions for a candidate applying for the role below,
-                calibrated to the given difficulty level.
+                Generate exactly 10 interview questions for a candidate applying for the role below,
+                calibrated to the given difficulty level and grounded in the candidate's resume.
+                Reference the candidate's actual skills, projects and experience where relevant.
                 Respond ONLY with JSON that matches the requested schema.
 
                 - question: a clear, standalone interview question
@@ -170,7 +172,10 @@ public class AIService {
 
                 Role: %s
                 Difficulty: %s
-                """.formatted(role, difficulty.name());
+
+                Resume:
+                %s
+                """.formatted(role, difficulty.name(), resumeText);
     }
 
     private <T> T parseResponse(String response, Class<T> type) {
