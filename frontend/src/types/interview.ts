@@ -52,6 +52,14 @@ export interface JobRole {
   name: string
 }
 
+/** Mirrors the backend AtsReport — resume match against a target role. */
+export interface AtsReport {
+  score: number
+  summary: string
+  strengths: string[]
+  improvements: string[]
+}
+
 /** Mirrors the backend NextQuestionResponse — one question generated on demand. */
 export interface NextQuestionResponse {
   question: string
