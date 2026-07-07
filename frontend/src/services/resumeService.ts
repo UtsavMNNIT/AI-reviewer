@@ -28,3 +28,9 @@ export async function uploadResume(
 
   return data.data // unwrap the ApiResponse envelope
 }
+
+/** Lists the authenticated user's uploaded resumes. */
+export async function getResumes(): Promise<ResumeResponse[]> {
+  const { data } = await apiClient.get<ApiEnvelope<ResumeResponse[]>>('/resumes')
+  return data.data // unwrap the ApiResponse envelope
+}
