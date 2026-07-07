@@ -205,32 +205,22 @@ export default function InterviewsPage() {
         {ats && !atsMutation.isPending && <AtsReportCard report={ats} />}
 
         <div className="flex justify-end gap-2">
-          {!ats ? (
-            <Button
-              type="submit"
-              loading={atsMutation.isPending}
-              disabled={!role || !resumeId}
-            >
-              Check ATS score
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="submit"
-                variant="ghost"
-                loading={atsMutation.isPending}
-              >
-                Re-check
-              </Button>
-              <Button
-                type="button"
-                onClick={() => createMutation.mutate()}
-                loading={createMutation.isPending}
-              >
-                Start interview
-              </Button>
-            </>
-          )}
+          <Button
+            type="submit"
+            variant="ghost"
+            loading={atsMutation.isPending}
+            disabled={!role || !resumeId || busy}
+          >
+            Check ATS score
+          </Button>
+          <Button
+            type="button"
+            onClick={() => createMutation.mutate()}
+            loading={createMutation.isPending}
+            disabled={!role || !resumeId || busy}
+          >
+            Start interview
+          </Button>
         </div>
       </form>
 
