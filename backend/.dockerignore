@@ -1,5 +1,5 @@
 target/
 uploads/
-*.properties
-!src/main/resources/application.properties
+gemini-secrets.properties
+mongo-secrets.properties
 .git/

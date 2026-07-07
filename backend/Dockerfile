@@ -1,8 +1,9 @@
-# --- Build stage: compile the Spring Boot jar with the Maven wrapper ---
-FROM eclipse-temurin:21-jdk AS build
+# --- Build stage: compile the Spring Boot jar with Maven (no wrapper needed) ---
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
-COPY . .
-RUN chmod +x mvnw && ./mvnw -q -B -DskipTests package
+COPY pom.xml .
+COPY src ./src
+RUN mvn -q -B -DskipTests package
 
 # --- Run stage: slim JRE image running the jar ---
 FROM eclipse-temurin:21-jre
