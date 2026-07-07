@@ -1,5 +1,6 @@
 package com.utsav.aiInterview.service;
 
+import com.utsav.aiInterview.dto.AnswerEvaluation;
 import com.utsav.aiInterview.dto.CreateInterviewRequest;
 import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.InterviewResponse;
@@ -7,6 +8,7 @@ import com.utsav.aiInterview.dto.QuestionResponse;
 import com.utsav.aiInterview.dto.ResumeResponse;
 import com.utsav.aiInterview.exception.BadRequestException;
 import com.utsav.aiInterview.exception.ResourceNotFoundException;
+import com.utsav.aiInterview.model.Evaluation;
 import com.utsav.aiInterview.model.Interview;
 import com.utsav.aiInterview.model.InterviewStatus;
 import com.utsav.aiInterview.model.Question;
@@ -100,6 +102,36 @@ public class InterviewService {
         interview.setStatus(InterviewStatus.COMPLETED);
         interview.setCompletedAt(Instant.now());
         return toResponse(interviewRepository.save(interview));
+    }
+
+    /**
+     * Evaluates the candidate's answer to a question via Gemini, persists both the
+     * answer and the evaluation on the interview, and returns the evaluation.
+     */
+    public AnswerEvaluation evaluateAnswer(String id, int questionIndex, String answer, String userEmail) {
+        Interview interview = findOwned(id, userEmail);
+
+        List<Question> questions = interview.getQuestions();
+        if (questions == null || questionIndex < 0 || questionIndex >= questions.size()) {
+            throw new BadRequestException("Invalid question index: " + questionIndex);
+        }
+        Question question = questions.get(questionIndex);
+
+        AnswerEvaluation evaluation = aiService.evaluateAnswer(
+                interview.getRole(), interview.getDifficulty(),
+                question.getQuestion(), question.getTopic(), answer);
+
+        question.setAnswer(answer);
+        question.setEvaluation(Evaluation.builder()
+                .score(evaluation.score())
+                .summary(evaluation.summary())
+                .strengths(evaluation.strengths())
+                .weaknesses(evaluation.weaknesses())
+                .suggestions(evaluation.suggestions())
+                .build());
+
+        interviewRepository.save(interview);
+        return evaluation;
     }
 
     private Interview findOwned(String id, String userEmail) {

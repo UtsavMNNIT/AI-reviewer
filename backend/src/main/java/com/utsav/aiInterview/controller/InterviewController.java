@@ -1,7 +1,9 @@
 package com.utsav.aiInterview.controller;
 
+import com.utsav.aiInterview.dto.AnswerEvaluation;
 import com.utsav.aiInterview.dto.ApiResponse;
 import com.utsav.aiInterview.dto.CreateInterviewRequest;
+import com.utsav.aiInterview.dto.EvaluateAnswerRequest;
 import com.utsav.aiInterview.dto.InterviewResponse;
 import com.utsav.aiInterview.service.InterviewService;
 import jakarta.validation.Valid;
@@ -67,6 +69,16 @@ public class InterviewController {
             Authentication authentication) {
         InterviewResponse interview = interviewService.complete(id, authentication.getName());
         return ResponseEntity.ok(new ApiResponse<>(true, "Interview completed", interview));
+    }
+
+    @PostMapping("/{id}/answer")
+    public ResponseEntity<ApiResponse<AnswerEvaluation>> evaluateAnswer(
+            @PathVariable String id,
+            @Valid @RequestBody EvaluateAnswerRequest request,
+            Authentication authentication) {
+        AnswerEvaluation evaluation = interviewService.evaluateAnswer(
+                id, request.questionIndex(), request.answer(), authentication.getName());
+        return ResponseEntity.ok(new ApiResponse<>(true, "Answer evaluated", evaluation));
     }
 
     @DeleteMapping("/{id}")
