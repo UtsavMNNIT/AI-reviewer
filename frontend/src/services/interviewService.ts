@@ -1,5 +1,6 @@
 import apiClient from './apiClient'
 import type {
+  AnswerEvaluation,
   ApiEnvelope,
   CreateInterviewRequest,
   InterviewResponse,
@@ -37,6 +38,27 @@ export async function generateNextQuestion(
 export async function getInterview(id: string): Promise<InterviewResponse> {
   const { data } = await apiClient.get<ApiEnvelope<InterviewResponse>>(
     `/interviews/${id}`,
+  )
+  return data.data
+}
+
+/** Lists the authenticated user's interviews (with questions + any evaluations). */
+export async function getInterviews(): Promise<InterviewResponse[]> {
+  const { data } = await apiClient.get<ApiEnvelope<InterviewResponse[]>>(
+    '/interviews',
+  )
+  return data.data
+}
+
+/** Submits an answer for AI scoring; the score is stored on the interview. */
+export async function evaluateAnswer(
+  id: string,
+  questionIndex: number,
+  answer: string,
+): Promise<AnswerEvaluation> {
+  const { data } = await apiClient.post<ApiEnvelope<AnswerEvaluation>>(
+    `/interviews/${id}/answer`,
+    { questionIndex, answer },
   )
   return data.data
 }

@@ -8,10 +8,22 @@ export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD'
 /** Mirrors the backend InterviewStatus enum. */
 export type InterviewStatus = 'UPCOMING' | 'RUNNING' | 'COMPLETED'
 
+/** Mirrors the backend EvaluationResponse / AnswerEvaluation DTO. */
+export interface AnswerEvaluation {
+  score: number
+  summary: string
+  strengths: string[]
+  weaknesses: string[]
+  suggestions: string[]
+}
+
 /** Mirrors the backend QuestionResponse DTO (embedded on an interview). */
 export interface QuestionResponse {
   question: string
   topic: string
+  // Present only once the answer has been submitted and scored.
+  answer?: string
+  evaluation?: AnswerEvaluation
 }
 
 /** Mirrors the backend InterviewResponse DTO returned from /api/interviews. */

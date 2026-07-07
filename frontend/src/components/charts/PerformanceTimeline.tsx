@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { TimelinePoint } from '../../data/mockReport'
+import type { TimelinePoint } from '../../types/report'
 import { AXIS, BRAND, GRID, tooltipStyle } from './chartTheme'
 
 type Props = { data: TimelinePoint[] }

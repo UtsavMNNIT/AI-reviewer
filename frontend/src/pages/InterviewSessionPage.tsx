@@ -17,6 +17,7 @@ import Button from '../components/ui/Button'
 import ThinkingDots from '../components/ui/ThinkingDots'
 import {
   completeInterview,
+  evaluateAnswer,
   generateNextQuestion,
   getInterview,
   startInterview,
@@ -47,8 +48,13 @@ export default function InterviewSessionPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [elapsed, setElapsed] = useState(0)
   const [camError, setCamError] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const startedRef = useRef(false)
   const seededRef = useRef(false)
+  // Answer text already submitted for scoring, per question index (dedupe).
+  const submittedRef = useRef<Record<number, string>>({})
+  // In-flight evaluation promises, awaited before finishing.
+  const pendingEvalsRef = useRef<Promise<unknown>[]>([])
 
   const {
     data: interview,
@@ -133,12 +139,31 @@ export default function InterviewSessionPage() {
   const isLastQuestion = currentIndex === totalTarget - 1
   const thinking = genMutation.isPending
 
+  // Fire-and-forget: submit an answer for AI scoring (background). Deduped by text.
+  function submitAnswer(index: number) {
+    const text = (answers[index] ?? '').trim()
+    if (!text || submittedRef.current[index] === text) return
+    submittedRef.current[index] = text
+    const p = evaluateAnswer(id, index, text).catch(() => {
+      // A failed evaluation just leaves this question unscored — don't disrupt the flow.
+    })
+    pendingEvalsRef.current.push(p)
+  }
+
   function handleNext() {
+    submitAnswer(currentIndex)
     if (currentIndex < generatedCount - 1) {
       setCurrentIndex((i) => i + 1)
     } else if (generatedCount < totalTarget) {
       genMutation.mutate() // generates, appends, advances on success
     }
+  }
+
+  async function handleFinish() {
+    submitAnswer(currentIndex)
+    setFinishing(true)
+    await Promise.allSettled(pendingEvalsRef.current)
+    completeMutation.mutate()
   }
 
   if (isLoading) {
@@ -306,8 +331,8 @@ export default function InterviewSessionPage() {
 
             {isLastQuestion ? (
               <Button
-                onClick={() => completeMutation.mutate()}
-                loading={completeMutation.isPending}
+                onClick={handleFinish}
+                loading={finishing || completeMutation.isPending}
                 disabled={!current || thinking}
               >
                 <Flag size={16} /> Finish interview
