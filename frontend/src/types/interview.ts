@@ -39,3 +39,11 @@ export interface JobRole {
   id: string
   name: string
 }
+
+/** Mirrors the backend NextQuestionResponse — one question generated on demand. */
+export interface NextQuestionResponse {
+  question: string
+  topic: string
+  questionNumber: number
+  totalQuestions: number
+}

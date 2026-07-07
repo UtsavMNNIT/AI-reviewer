@@ -5,6 +5,7 @@ import com.utsav.aiInterview.dto.ApiResponse;
 import com.utsav.aiInterview.dto.CreateInterviewRequest;
 import com.utsav.aiInterview.dto.EvaluateAnswerRequest;
 import com.utsav.aiInterview.dto.InterviewResponse;
+import com.utsav.aiInterview.dto.NextQuestionResponse;
 import com.utsav.aiInterview.service.InterviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,15 @@ public class InterviewController {
             Authentication authentication) {
         InterviewResponse interview = interviewService.start(id, authentication.getName());
         return ResponseEntity.ok(new ApiResponse<>(true, "Interview started", interview));
+    }
+
+    @PostMapping("/{id}/questions/next")
+    public ResponseEntity<ApiResponse<NextQuestionResponse>> nextQuestion(
+            @PathVariable String id,
+            Authentication authentication) {
+        NextQuestionResponse question = interviewService.generateNextQuestion(id, authentication.getName());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Question generated", question));
     }
 
     @PostMapping("/{id}/complete")
