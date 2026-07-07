@@ -51,17 +51,20 @@ public class AuthService {
      * Authenticates credentials and issues a JWT access token.
      */
     public AuthResponse login(LoginRequest request) {
+        // Distinguish "no such account" from "wrong password" so a first-time
+        // visitor is told to sign up instead of seeing a generic credentials error.
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No account found for this email. Please create an account."));
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
-
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         return buildAuthResponse(user);
     }
 
     private AuthResponse buildAuthResponse(User user) {
         String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthResponse(token, AppConstants.TOKEN_TYPE, user.getEmail(), user.getRole().name());
+        return new AuthResponse(token, AppConstants.TOKEN_TYPE, user.getEmail(), user.getName(), user.getRole().name());
     }
 }
