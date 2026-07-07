@@ -1,8 +1,10 @@
 package com.utsav.aiInterview.service;
 
+import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.ResumeAnalysis;
 import com.utsav.aiInterview.exception.AIServiceException;
 import com.utsav.aiInterview.exception.BadRequestException;
+import com.utsav.aiInterview.model.Difficulty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -62,7 +64,34 @@ public class AIService {
             throw new AIServiceException("Failed to call Gemini API", ex);
         }
 
-        return parseResponse(response);
+        return parseResponse(response, ResumeAnalysis.class);
+    }
+
+    /**
+     * Generates a set of interview questions for the given role and difficulty via Gemini.
+     */
+    public GeneratedQuestions generateInterviewQuestions(String role, Difficulty difficulty) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BadRequestException("Gemini API key is not configured");
+        }
+
+        String url = baseUrl + "/models/" + model + ":generateContent";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(API_KEY_HEADER, apiKey);
+
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(buildInterviewRequest(role, difficulty), headers);
+
+        String response;
+        try {
+            response = restTemplate.postForObject(url, entity, String.class);
+        } catch (RestClientException ex) {
+            throw new AIServiceException("Failed to call Gemini API", ex);
+        }
+
+        return parseResponse(response, GeneratedQuestions.class);
     }
 
     private Map<String, Object> buildRequest(String resumeText) {
@@ -106,7 +135,45 @@ public class AIService {
                 """ + resumeText;
     }
 
-    private ResumeAnalysis parseResponse(String response) {
+    private Map<String, Object> buildInterviewRequest(String role, Difficulty difficulty) {
+        Map<String, Object> textPart = Map.of("text", buildInterviewPrompt(role, difficulty));
+        Map<String, Object> content = Map.of("parts", List.of(textPart));
+
+        Map<String, Object> questionItem = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "question", Map.of("type", "STRING"),
+                        "topic", Map.of("type", "STRING")));
+        Map<String, Object> schema = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "questions", Map.of("type", "ARRAY", "items", questionItem)));
+
+        Map<String, Object> generationConfig = Map.of(
+                "responseMimeType", "application/json",
+                "responseSchema", schema);
+
+        return Map.of(
+                "contents", List.of(content),
+                "generationConfig", generationConfig);
+    }
+
+    private String buildInterviewPrompt(String role, Difficulty difficulty) {
+        return """
+                You are an expert technical interviewer.
+                Generate exactly 8 interview questions for a candidate applying for the role below,
+                calibrated to the given difficulty level.
+                Respond ONLY with JSON that matches the requested schema.
+
+                - question: a clear, standalone interview question
+                - topic: the topic or skill area the question assesses
+
+                Role: %s
+                Difficulty: %s
+                """.formatted(role, difficulty.name());
+    }
+
+    private <T> T parseResponse(String response, Class<T> type) {
         if (response == null || response.isBlank()) {
             throw new AIServiceException("Gemini returned an empty response");
         }
@@ -124,7 +191,7 @@ public class AIService {
             if (json == null || json.isBlank()) {
                 throw new AIServiceException("Gemini returned an empty analysis");
             }
-            return objectMapper.readValue(json, ResumeAnalysis.class);
+            return objectMapper.readValue(json, type);
         } catch (JacksonException ex) {
             throw new AIServiceException("Failed to parse Gemini response", ex);
         }
