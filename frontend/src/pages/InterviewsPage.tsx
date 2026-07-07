@@ -1,12 +1,99 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { Video } from 'lucide-react'
-import PagePlaceholder from '../components/PagePlaceholder'
+import Button from '../components/ui/Button'
+import TextField from '../components/ui/TextField'
+import { createInterview } from '../services/interviewService'
+import { getErrorMessage } from '../utils/errors'
+import type { Difficulty } from '../types/interview'
+
+const DIFFICULTIES: Difficulty[] = ['EASY', 'MEDIUM', 'HARD']
 
 export default function InterviewsPage() {
+  const navigate = useNavigate()
+  const [role, setRole] = useState('')
+  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM')
+
+  const mutation = useMutation({
+    mutationFn: () => createInterview({ role: role.trim(), difficulty }),
+    onSuccess: (data) => navigate(`/interviews/${data.id}`),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!role.trim()) {
+      toast.error('Please enter a role')
+      return
+    }
+    mutation.mutate()
+  }
+
   return (
-    <PagePlaceholder
-      icon={Video}
-      title="Interviews"
-      description="Start and manage proctored interview sessions."
-    />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600/15 text-brand-400">
+          <Video size={22} />
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold text-white">Start an interview</h1>
+          <p className="text-sm text-slate-400">
+            We&apos;ll generate tailored questions for your role.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
+        <TextField
+          label="Role"
+          name="role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="e.g. Backend Engineer"
+          disabled={mutation.isPending}
+        />
+
+        <div className="flex flex-col gap-1 text-left">
+          <label
+            htmlFor="difficulty"
+            className="text-sm font-medium text-slate-300"
+          >
+            Difficulty
+          </label>
+          <select
+            id="difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+            disabled={mutation.isPending}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+          >
+            {DIFFICULTIES.map((d) => (
+              <option key={d} value={d}>
+                {d.charAt(0) + d.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" loading={mutation.isPending}>
+            Start interview
+          </Button>
+        </div>
+      </form>
+
+      {mutation.isPending && (
+        <p className="mt-4 text-center text-xs text-slate-500">
+          Generating questions — this can take a few seconds…
+        </p>
+      )}
+    </motion.div>
   )
 }
