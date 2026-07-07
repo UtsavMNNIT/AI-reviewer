@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Video, BarChart3, FileText, X, Brain } from 'lucide-react'
+import { LayoutDashboard, Video, BarChart3, FileText, Code2, X, Brain } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -10,6 +10,7 @@ const links = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/resumes', label: 'Resume', icon: FileText },
   { to: '/interviews', label: 'Interviews', icon: Video },
+  { to: '/coding', label: 'Coding Round', icon: Code2 },
   { to: '/results', label: 'Results', icon: BarChart3 },
 ]
 
