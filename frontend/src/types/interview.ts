@@ -32,3 +32,9 @@ export interface CreateInterviewRequest {
   role: string
   difficulty: Difficulty
 }
+
+/** Mirrors the backend JobRoleResponse DTO returned from /api/roles. */
+export interface JobRole {
+  id: string
+  name: string
+}

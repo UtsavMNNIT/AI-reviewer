@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Video } from 'lucide-react'
 import Button from '../components/ui/Button'
-import TextField from '../components/ui/TextField'
+import SearchableSelect from '../components/ui/SearchableSelect'
 import { createInterview } from '../services/interviewService'
+import { getRoles } from '../services/roleService'
 import { getErrorMessage } from '../utils/errors'
 import type { Difficulty } from '../types/interview'
 
@@ -17,16 +18,22 @@ export default function InterviewsPage() {
   const [role, setRole] = useState('')
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM')
 
+  const {
+    data: roles,
+    isLoading: rolesLoading,
+    isError: rolesError,
+  } = useQuery({ queryKey: ['roles'], queryFn: getRoles })
+
   const mutation = useMutation({
-    mutationFn: () => createInterview({ role: role.trim(), difficulty }),
+    mutationFn: () => createInterview({ role, difficulty }),
     onSuccess: (data) => navigate(`/interviews/${data.id}`),
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!role.trim()) {
-      toast.error('Please enter a role')
+    if (!role) {
+      toast.error('Please choose a role')
       return
     }
     mutation.mutate()
@@ -45,20 +52,32 @@ export default function InterviewsPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">Start an interview</h1>
           <p className="text-sm text-slate-400">
-            We&apos;ll generate tailored questions for your role.
+            Choose the role you want to interview for.
           </p>
         </div>
       </div>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
-        <TextField
-          label="Role"
-          name="role"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          placeholder="e.g. Backend Engineer"
-          disabled={mutation.isPending}
-        />
+        <div className="flex flex-col gap-1 text-left">
+          <label htmlFor="role" className="text-sm font-medium text-slate-300">
+            Role
+          </label>
+          {rolesError ? (
+            <p className="text-sm text-red-400">
+              Couldn&apos;t load roles. Please try again later.
+            </p>
+          ) : (
+            <SearchableSelect
+              id="role"
+              options={roles ?? []}
+              value={role}
+              onChange={setRole}
+              placeholder="Search for a role…"
+              loading={rolesLoading}
+              disabled={mutation.isPending}
+            />
+          )}
+        </div>
 
         <div className="flex flex-col gap-1 text-left">
           <label
@@ -83,7 +102,7 @@ export default function InterviewsPage() {
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" loading={mutation.isPending}>
+          <Button type="submit" loading={mutation.isPending} disabled={!role}>
             Start interview
           </Button>
         </div>
