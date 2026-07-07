@@ -2,6 +2,7 @@ package com.utsav.aiInterview.service;
 
 import com.utsav.aiInterview.dto.AnswerEvaluation;
 import com.utsav.aiInterview.dto.CreateInterviewRequest;
+import com.utsav.aiInterview.dto.EvaluationResponse;
 import com.utsav.aiInterview.dto.GeneratedQuestion;
 import com.utsav.aiInterview.dto.InterviewResponse;
 import com.utsav.aiInterview.dto.NextQuestionResponse;
@@ -173,7 +174,11 @@ public class InterviewService {
         List<QuestionResponse> questions = interview.getQuestions() == null
                 ? List.of()
                 : interview.getQuestions().stream()
-                        .map(q -> new QuestionResponse(q.getQuestion(), q.getTopic()))
+                        .map(q -> new QuestionResponse(
+                                q.getQuestion(),
+                                q.getTopic(),
+                                q.getAnswer(),
+                                toEvaluationResponse(q.getEvaluation())))
                         .toList();
         return new InterviewResponse(
                 interview.getId(),
@@ -185,5 +190,17 @@ public class InterviewService {
                 interview.getCreatedAt(),
                 interview.getStartedAt(),
                 interview.getCompletedAt());
+    }
+
+    private EvaluationResponse toEvaluationResponse(Evaluation evaluation) {
+        if (evaluation == null) {
+            return null;
+        }
+        return new EvaluationResponse(
+                evaluation.getScore(),
+                evaluation.getSummary(),
+                evaluation.getStrengths(),
+                evaluation.getWeaknesses(),
+                evaluation.getSuggestions());
     }
 }

@@ -1,5 +1,5 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import type { DistributionSlice } from '../../data/mockReport'
+import type { DistributionSlice } from '../../types/report'
 import { CATEGORY_COLORS, tooltipStyle } from './chartTheme'
 
 type Props = { data: DistributionSlice[] }

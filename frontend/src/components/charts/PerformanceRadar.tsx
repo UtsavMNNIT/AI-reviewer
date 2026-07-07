@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts'
-import type { RadarPoint } from '../../data/mockReport'
+import type { RadarPoint } from '../../types/report'
 import { AXIS, BRAND, GRID, tooltipStyle } from './chartTheme'
 
 type Props = { data: RadarPoint[] }
