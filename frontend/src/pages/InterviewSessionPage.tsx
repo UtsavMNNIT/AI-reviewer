@@ -14,13 +14,18 @@ import {
   VideoOff,
 } from 'lucide-react'
 import Button from '../components/ui/Button'
+import ThinkingDots from '../components/ui/ThinkingDots'
 import {
   completeInterview,
+  generateNextQuestion,
   getInterview,
   startInterview,
 } from '../services/interviewService'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { getErrorMessage } from '../utils/errors'
+import type { QuestionResponse } from '../types/interview'
+
+const DEFAULT_TOTAL = 8
 
 function formatElapsed(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -35,11 +40,15 @@ export default function InterviewSessionPage() {
   const navigate = useNavigate()
 
   const [currentIndex, setCurrentIndex] = useState(0)
-  // Client-side only — the backend has no answer-submission endpoint.
+  // Questions accumulate here as they're generated one at a time.
+  const [questions, setQuestions] = useState<QuestionResponse[]>([])
+  const [totalTarget, setTotalTarget] = useState(DEFAULT_TOTAL)
+  // Client-side only — answers are not sent to the backend.
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [elapsed, setElapsed] = useState(0)
   const [camError, setCamError] = useState(false)
   const startedRef = useRef(false)
+  const seededRef = useRef(false)
 
   const {
     data: interview,
@@ -57,6 +66,19 @@ export default function InterviewSessionPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
+  const genMutation = useMutation({
+    mutationFn: () => generateNextQuestion(id),
+    onSuccess: (res) => {
+      setTotalTarget(res.totalQuestions)
+      setQuestions((prev) => {
+        const next = [...prev, { question: res.question, topic: res.topic }]
+        setCurrentIndex(next.length - 1)
+        return next
+      })
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   const completeMutation = useMutation({
     mutationFn: () => completeInterview(id),
     onSuccess: () => {
@@ -66,14 +88,27 @@ export default function InterviewSessionPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
-  // Kick off the interview once, if it hasn't started yet.
+  // Seed local state from the loaded interview, then start + generate the first
+  // question if none exist yet. Runs once.
   useEffect(() => {
-    if (!interview || startedRef.current) return
-    if (interview.status === 'UPCOMING') {
+    if (!interview || seededRef.current) return
+    seededRef.current = true
+
+    const existing = interview.questions ?? []
+    if (existing.length > 0) {
+      setQuestions(existing)
+      setTotalTarget(Math.max(existing.length, DEFAULT_TOTAL))
+    }
+
+    if (interview.status === 'UPCOMING' && !startedRef.current) {
       startedRef.current = true
       startMutation.mutate()
     }
-  }, [interview, startMutation])
+
+    if (existing.length === 0) {
+      genMutation.mutate()
+    }
+  }, [interview, startMutation, genMutation])
 
   // Elapsed count-up timer, running until the interview is completed.
   const timerActive = Boolean(interview) && interview?.status !== 'COMPLETED'
@@ -86,7 +121,6 @@ export default function InterviewSessionPage() {
   const speech = useSpeechRecognition({
     onFinalResult: (text) => {
       if (!text) return
-    
       setAnswers((prev) => {
         const existing = prev[currentIndex] ?? ''
         return { ...prev, [currentIndex]: existing ? `${existing} ${text}` : text }
@@ -94,10 +128,18 @@ export default function InterviewSessionPage() {
     },
   })
 
-  const questions = interview?.questions ?? []
-  const total = questions.length
-  const isLast = currentIndex === total - 1
   const current = questions[currentIndex]
+  const generatedCount = questions.length
+  const isLastQuestion = currentIndex === totalTarget - 1
+  const thinking = genMutation.isPending
+
+  function handleNext() {
+    if (currentIndex < generatedCount - 1) {
+      setCurrentIndex((i) => i + 1)
+    } else if (generatedCount < totalTarget) {
+      genMutation.mutate() // generates, appends, advances on success
+    }
+  }
 
   if (isLoading) {
     return (
@@ -133,7 +175,7 @@ export default function InterviewSessionPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">{interview.role}</h1>
           <p className="text-sm text-slate-400">
-            {interview.difficulty} · Question {currentIndex + 1} of {total}
+            {interview.difficulty} · Question {currentIndex + 1} of {totalTarget}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 tabular-nums">
@@ -146,7 +188,9 @@ export default function InterviewSessionPage() {
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
         <div
           className="h-full rounded-full bg-brand-600 transition-all"
-          style={{ width: `${total ? ((currentIndex + 1) / total) * 100 : 0}%` }}
+          style={{
+            width: `${totalTarget ? ((currentIndex + 1) / totalTarget) * 100 : 0}%`,
+          }}
         />
       </div>
 
@@ -178,14 +222,29 @@ export default function InterviewSessionPage() {
         {/* Right column: question + answer + nav */}
         <div className="flex flex-col gap-6">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            {current?.topic && (
-              <span className="inline-block rounded-full bg-brand-600/15 px-3 py-1 text-xs font-medium text-brand-300">
-                {current.topic}
-              </span>
+            {thinking ? (
+              <ThinkingDots label="Thinking of the next question…" />
+            ) : genMutation.isError && !current ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <p className="text-sm text-slate-400">
+                  Couldn&apos;t generate the question.
+                </p>
+                <Button variant="ghost" onClick={() => genMutation.mutate()}>
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <>
+                {current?.topic && (
+                  <span className="inline-block rounded-full bg-brand-600/15 px-3 py-1 text-xs font-medium text-brand-300">
+                    {current.topic}
+                  </span>
+                )}
+                <p className="mt-3 text-lg font-medium leading-relaxed text-white">
+                  {current?.question ?? 'No question available.'}
+                </p>
+              </>
             )}
-            <p className="mt-3 text-lg font-medium leading-relaxed text-white">
-              {current?.question ?? 'No question available.'}
-            </p>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -201,6 +260,7 @@ export default function InterviewSessionPage() {
                   variant="ghost"
                   onClick={() => (speech.listening ? speech.stop() : speech.start())}
                   className={speech.listening ? 'text-red-400 hover:text-red-300' : ''}
+                  disabled={!current}
                 >
                   {speech.listening ? (
                     <>
@@ -224,8 +284,9 @@ export default function InterviewSessionPage() {
               onChange={(e) =>
                 setAnswers((prev) => ({ ...prev, [currentIndex]: e.target.value }))
               }
+              disabled={!current}
               placeholder="Type your answer, or press Record and speak…"
-              className="h-48 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+              className="h-48 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
             />
             {speech.listening && speech.interim && (
               <p className="mt-2 text-xs italic text-slate-500">
@@ -238,20 +299,21 @@ export default function InterviewSessionPage() {
             <Button
               variant="ghost"
               onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-              disabled={currentIndex === 0}
+              disabled={currentIndex === 0 || thinking}
             >
               <ChevronLeft size={16} /> Previous
             </Button>
 
-            {isLast ? (
+            {isLastQuestion ? (
               <Button
                 onClick={() => completeMutation.mutate()}
                 loading={completeMutation.isPending}
+                disabled={!current || thinking}
               >
                 <Flag size={16} /> Finish interview
               </Button>
             ) : (
-              <Button onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}>
+              <Button onClick={handleNext} loading={thinking} disabled={!current}>
                 Next <ChevronRight size={16} />
               </Button>
             )}

@@ -1,6 +1,7 @@
 package com.utsav.aiInterview.service;
 
 import com.utsav.aiInterview.dto.AnswerEvaluation;
+import com.utsav.aiInterview.dto.GeneratedQuestion;
 import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.ResumeAnalysis;
 import com.utsav.aiInterview.exception.AIServiceException;
@@ -94,6 +95,36 @@ public class AIService {
         }
 
         return parseResponse(response, GeneratedQuestions.class);
+    }
+
+    /**
+     * Generates a single interview question tailored to the resume, role and difficulty,
+     * avoiding any of the already-asked questions. Used to build the interview one
+     * question at a time so the candidate isn't kept waiting for a full batch.
+     */
+    public GeneratedQuestion generateNextQuestion(String resumeText, String role,
+                                                  Difficulty difficulty, List<String> alreadyAsked) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BadRequestException("Gemini API key is not configured");
+        }
+
+        String url = baseUrl + "/models/" + model + ":generateContent";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(API_KEY_HEADER, apiKey);
+
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(buildNextQuestionRequest(resumeText, role, difficulty, alreadyAsked), headers);
+
+        String response;
+        try {
+            response = restTemplate.postForObject(url, entity, String.class);
+        } catch (RestClientException ex) {
+            throw new AIServiceException("Failed to call Gemini API", ex);
+        }
+
+        return parseResponse(response, GeneratedQuestion.class);
     }
 
     /**
@@ -206,6 +237,55 @@ public class AIService {
                 Resume:
                 %s
                 """.formatted(role, difficulty.name(), resumeText);
+    }
+
+    private Map<String, Object> buildNextQuestionRequest(String resumeText, String role,
+                                                         Difficulty difficulty, List<String> alreadyAsked) {
+        Map<String, Object> textPart = Map.of("text",
+                buildNextQuestionPrompt(resumeText, role, difficulty, alreadyAsked));
+        Map<String, Object> content = Map.of("parts", List.of(textPart));
+
+        Map<String, Object> schema = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "question", Map.of("type", "STRING"),
+                        "topic", Map.of("type", "STRING")));
+
+        Map<String, Object> generationConfig = Map.of(
+                "responseMimeType", "application/json",
+                "responseSchema", schema);
+
+        return Map.of(
+                "contents", List.of(content),
+                "generationConfig", generationConfig);
+    }
+
+    private String buildNextQuestionPrompt(String resumeText, String role,
+                                           Difficulty difficulty, List<String> alreadyAsked) {
+        String asked = (alreadyAsked == null || alreadyAsked.isEmpty())
+                ? "(none yet — this is the first question)"
+                : alreadyAsked.stream().map(q -> "- " + q).collect(java.util.stream.Collectors.joining("\n"));
+        return """
+                You are an expert technical interviewer conducting a live interview.
+                Generate exactly ONE interview question for a candidate applying for the role below,
+                calibrated to the given difficulty level and grounded in the candidate's resume.
+                Reference the candidate's actual skills, projects and experience where relevant.
+                Do NOT repeat or closely overlap any of the already-asked questions listed below;
+                cover a different topic or skill area than those already asked.
+                Respond ONLY with JSON that matches the requested schema.
+
+                - question: a clear, standalone interview question
+                - topic: the topic or skill area the question assesses
+
+                Role: %s
+                Difficulty: %s
+
+                Already-asked questions:
+                %s
+
+                Resume:
+                %s
+                """.formatted(role, difficulty.name(), asked, resumeText);
     }
 
     private Map<String, Object> buildEvaluationRequest(String role, Difficulty difficulty,

@@ -3,6 +3,7 @@ import type {
   ApiEnvelope,
   CreateInterviewRequest,
   InterviewResponse,
+  NextQuestionResponse,
 } from '../types/interview'
 
 /**
@@ -11,13 +12,23 @@ import type {
  * Bearer token and handles 401 → logout automatically.
  */
 
-/** Creates an interview — the backend synchronously generates 8 questions via Gemini. */
+/** Creates an interview instantly (no questions yet — they're generated one at a time). */
 export async function createInterview(
   body: CreateInterviewRequest,
 ): Promise<InterviewResponse> {
   const { data } = await apiClient.post<ApiEnvelope<InterviewResponse>>(
     '/interviews',
     body,
+  )
+  return data.data
+}
+
+/** Generates the next interview question on demand. */
+export async function generateNextQuestion(
+  id: string,
+): Promise<NextQuestionResponse> {
+  const { data } = await apiClient.post<ApiEnvelope<NextQuestionResponse>>(
+    `/interviews/${id}/questions/next`,
   )
   return data.data
 }

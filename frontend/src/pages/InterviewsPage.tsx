@@ -187,7 +187,7 @@ export default function InterviewsPage() {
 
       {mutation.isPending && (
         <p className="mt-4 text-center text-xs text-slate-500">
-          Generating questions — this can take a few seconds…
+          Starting interview…
         </p>
       )}
     </motion.div>

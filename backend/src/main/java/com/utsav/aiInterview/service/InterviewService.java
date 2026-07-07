@@ -2,8 +2,9 @@ package com.utsav.aiInterview.service;
 
 import com.utsav.aiInterview.dto.AnswerEvaluation;
 import com.utsav.aiInterview.dto.CreateInterviewRequest;
-import com.utsav.aiInterview.dto.GeneratedQuestions;
+import com.utsav.aiInterview.dto.GeneratedQuestion;
 import com.utsav.aiInterview.dto.InterviewResponse;
+import com.utsav.aiInterview.dto.NextQuestionResponse;
 import com.utsav.aiInterview.dto.QuestionResponse;
 import com.utsav.aiInterview.dto.ResumeResponse;
 import com.utsav.aiInterview.exception.BadRequestException;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,26 +30,21 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InterviewService {
 
+    /** Number of questions asked over the course of an interview. */
+    private static final int QUESTION_COUNT = 8;
+
     private final InterviewRepository interviewRepository;
     private final ResumeService resumeService;
     private final AIService aiService;
 
     /**
-     * Creates an interview by generating questions via Gemini from the candidate's resume,
-     * the chosen role and difficulty. The resume must belong to the requesting user.
+     * Creates an interview immediately, without questions. The questions are generated
+     * one at a time during the session (see {@link #generateNextQuestion}) so the
+     * candidate isn't kept waiting for a full batch. The resume must belong to the user.
      */
     public InterviewResponse create(CreateInterviewRequest request, String userEmail) {
-        ResumeResponse resume = resumeService.getById(request.resumeId(), userEmail);
-
-        GeneratedQuestions generated = aiService.generateInterviewQuestions(
-                resume.extractedText(), request.role(), request.difficulty());
-
-        List<Question> questions = generated.questions().stream()
-                .map(item -> Question.builder()
-                        .question(item.question())
-                        .topic(item.topic())
-                        .build())
-                .toList();
+        // Verify the resume exists and belongs to the user (fast, no AI call).
+        resumeService.getById(request.resumeId(), userEmail);
 
         Interview interview = Interview.builder()
                 .userEmail(userEmail)
@@ -55,11 +52,44 @@ public class InterviewService {
                 .role(request.role())
                 .difficulty(request.difficulty())
                 .status(InterviewStatus.UPCOMING)
-                .questions(questions)
+                .questions(new ArrayList<>())
                 .createdAt(Instant.now())
                 .build();
 
         return toResponse(interviewRepository.save(interview));
+    }
+
+    /**
+     * Generates the next interview question via Gemini (grounded in the resume, role and
+     * difficulty, avoiding already-asked questions), appends it to the interview and
+     * returns it with its position. Throws once {@link #QUESTION_COUNT} is reached.
+     */
+    public NextQuestionResponse generateNextQuestion(String id, String userEmail) {
+        Interview interview = findOwned(id, userEmail);
+
+        List<Question> questions = interview.getQuestions();
+        if (questions == null) {
+            questions = new ArrayList<>();
+            interview.setQuestions(questions);
+        }
+        if (questions.size() >= QUESTION_COUNT) {
+            throw new BadRequestException("All questions have already been generated");
+        }
+
+        ResumeResponse resume = resumeService.getById(interview.getResumeId(), userEmail);
+        List<String> alreadyAsked = questions.stream().map(Question::getQuestion).toList();
+
+        GeneratedQuestion generated = aiService.generateNextQuestion(
+                resume.extractedText(), interview.getRole(), interview.getDifficulty(), alreadyAsked);
+
+        questions.add(Question.builder()
+                .question(generated.question())
+                .topic(generated.topic())
+                .build());
+        interviewRepository.save(interview);
+
+        return new NextQuestionResponse(
+                generated.question(), generated.topic(), questions.size(), QUESTION_COUNT);
     }
 
     public InterviewResponse getById(String id, String userEmail) {

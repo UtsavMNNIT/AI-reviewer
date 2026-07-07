@@ -1,6 +1,5 @@
 package com.utsav.aiInterview.service;
 
-import com.utsav.aiInterview.dto.ResumeDownload;
 import com.utsav.aiInterview.dto.ResumeResponse;
 import com.utsav.aiInterview.exception.BadRequestException;
 import com.utsav.aiInterview.exception.ResourceNotFoundException;
@@ -10,20 +9,12 @@ import lombok.RequiredArgsConstructor;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Resume management service — upload, retrieval, download and deletion.
@@ -36,37 +27,26 @@ public class ResumeService {
 
     private final ResumeRepository resumeRepository;
 
-    @Value("${app.upload.dir}")
-    private String uploadDir;
-
     /**
-     * Stores an uploaded PDF, extracts its text and persists the metadata.
+     * Extracts the text from an uploaded PDF and persists it with metadata.
+     * The raw PDF is not stored — only the extracted text (which is all the
+     * interview flow needs) is kept in MongoDB.
      */
     public ResumeResponse upload(MultipartFile file, String userEmail) {
         validatePdf(file);
 
-        String originalFilename = file.getOriginalFilename();
-        String storedFilename = UUID.randomUUID() + ".pdf";
-
-        Path uploadPath = Paths.get(uploadDir);
-        Path targetPath = uploadPath.resolve(storedFilename);
-
         byte[] bytes;
         try {
             bytes = file.getBytes();
-            Files.createDirectories(uploadPath);
-            Files.write(targetPath, bytes);
         } catch (IOException ex) {
-            throw new UncheckedIOException("Failed to store uploaded file", ex);
+            throw new BadRequestException("Unable to read the uploaded file");
         }
 
         String extractedText = extractText(bytes);
 
         Resume resume = Resume.builder()
                 .userEmail(userEmail)
-                .originalFilename(originalFilename)
-                .storedFilename(storedFilename)
-                .filePath(targetPath.toString())
+                .originalFilename(file.getOriginalFilename())
                 .contentType(PDF_CONTENT_TYPE)
                 .fileSize(file.getSize())
                 .extractedText(extractedText)
@@ -87,28 +67,7 @@ public class ResumeService {
     }
 
     public void delete(String id, String userEmail) {
-        Resume resume = findOwned(id, userEmail);
-        try {
-            Files.deleteIfExists(Paths.get(resume.getFilePath()));
-        } catch (IOException ex) {
-            throw new UncheckedIOException("Failed to delete stored file", ex);
-        }
-        resumeRepository.delete(resume);
-    }
-
-    public ResumeDownload loadFileForDownload(String id, String userEmail) {
-        Resume resume = findOwned(id, userEmail);
-        Path path = Paths.get(resume.getFilePath());
-        Resource resource;
-        try {
-            resource = new UrlResource(path.toUri());
-        } catch (IOException ex) {
-            throw new UncheckedIOException("Failed to read stored file", ex);
-        }
-        if (!resource.exists() || !resource.isReadable()) {
-            throw new ResourceNotFoundException("Stored file not found for resume: " + id);
-        }
-        return new ResumeDownload(resource, resume.getOriginalFilename(), resume.getContentType());
+        resumeRepository.delete(findOwned(id, userEmail));
     }
 
     private Resume findOwned(String id, String userEmail) {
