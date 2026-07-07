@@ -18,4 +18,10 @@ public class Question {
     private String question;
 
     private String topic;
+
+    /** The candidate's submitted answer, populated on answer submission. */
+    private String answer;
+
+    /** AI evaluation of the submitted answer, populated on answer submission. */
+    private Evaluation evaluation;
 }

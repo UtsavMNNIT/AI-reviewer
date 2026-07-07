@@ -1,5 +1,6 @@
 package com.utsav.aiInterview.service;
 
+import com.utsav.aiInterview.dto.AnswerEvaluation;
 import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.ResumeAnalysis;
 import com.utsav.aiInterview.exception.AIServiceException;
@@ -95,6 +96,35 @@ public class AIService {
         return parseResponse(response, GeneratedQuestions.class);
     }
 
+    /**
+     * Evaluates a candidate's answer to an interview question via Gemini, returning
+     * a score with strengths, weaknesses and suggestions.
+     */
+    public AnswerEvaluation evaluateAnswer(String role, Difficulty difficulty,
+                                           String question, String topic, String answer) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BadRequestException("Gemini API key is not configured");
+        }
+
+        String url = baseUrl + "/models/" + model + ":generateContent";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(API_KEY_HEADER, apiKey);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                buildEvaluationRequest(role, difficulty, question, topic, answer), headers);
+
+        String response;
+        try {
+            response = restTemplate.postForObject(url, entity, String.class);
+        } catch (RestClientException ex) {
+            throw new AIServiceException("Failed to call Gemini API", ex);
+        }
+
+        return parseResponse(response, AnswerEvaluation.class);
+    }
+
     private Map<String, Object> buildRequest(String resumeText) {
         Map<String, Object> textPart = Map.of("text", buildPrompt(resumeText));
         Map<String, Object> content = Map.of("parts", List.of(textPart));
@@ -176,6 +206,53 @@ public class AIService {
                 Resume:
                 %s
                 """.formatted(role, difficulty.name(), resumeText);
+    }
+
+    private Map<String, Object> buildEvaluationRequest(String role, Difficulty difficulty,
+                                                       String question, String topic, String answer) {
+        Map<String, Object> textPart = Map.of("text",
+                buildEvaluationPrompt(role, difficulty, question, topic, answer));
+        Map<String, Object> content = Map.of("parts", List.of(textPart));
+
+        Map<String, Object> stringArray = Map.of("type", "ARRAY", "items", Map.of("type", "STRING"));
+        Map<String, Object> schema = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "score", Map.of("type", "INTEGER"),
+                        "summary", Map.of("type", "STRING"),
+                        "strengths", stringArray,
+                        "weaknesses", stringArray,
+                        "suggestions", stringArray));
+
+        Map<String, Object> generationConfig = Map.of(
+                "responseMimeType", "application/json",
+                "responseSchema", schema);
+
+        return Map.of(
+                "contents", List.of(content),
+                "generationConfig", generationConfig);
+    }
+
+    private String buildEvaluationPrompt(String role, Difficulty difficulty,
+                                         String question, String topic, String answer) {
+        return """
+                You are an expert technical interviewer evaluating a candidate's answer.
+                Assess the answer for correctness, depth, relevance, and clarity,
+                calibrated to the role and difficulty below.
+                Respond ONLY with JSON that matches the requested schema.
+
+                - score: an integer from 0 to 100 rating the overall quality of the answer
+                - summary: a concise 1-2 sentence overall assessment
+                - strengths: specific things the answer did well
+                - weaknesses: specific gaps, errors, or missing points
+                - suggestions: concrete, actionable ways to improve the answer
+
+                Role: %s
+                Difficulty: %s
+                Topic: %s
+                Question: %s
+                Candidate's answer: %s
+                """.formatted(role, difficulty.name(), topic, question, answer);
     }
 
     private <T> T parseResponse(String response, Class<T> type) {
