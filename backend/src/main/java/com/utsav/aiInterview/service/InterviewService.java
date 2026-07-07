@@ -4,6 +4,7 @@ import com.utsav.aiInterview.dto.CreateInterviewRequest;
 import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.InterviewResponse;
 import com.utsav.aiInterview.dto.QuestionResponse;
+import com.utsav.aiInterview.dto.ResumeResponse;
 import com.utsav.aiInterview.exception.BadRequestException;
 import com.utsav.aiInterview.exception.ResourceNotFoundException;
 import com.utsav.aiInterview.model.Interview;
@@ -26,14 +27,18 @@ import java.util.List;
 public class InterviewService {
 
     private final InterviewRepository interviewRepository;
+    private final ResumeService resumeService;
     private final AIService aiService;
 
     /**
-     * Creates an interview, generating its questions via Gemini for the chosen role and difficulty.
+     * Creates an interview by generating questions via Gemini from the candidate's resume,
+     * the chosen role and difficulty. The resume must belong to the requesting user.
      */
     public InterviewResponse create(CreateInterviewRequest request, String userEmail) {
-        GeneratedQuestions generated =
-                aiService.generateInterviewQuestions(request.role(), request.difficulty());
+        ResumeResponse resume = resumeService.getById(request.resumeId(), userEmail);
+
+        GeneratedQuestions generated = aiService.generateInterviewQuestions(
+                resume.extractedText(), request.role(), request.difficulty());
 
         List<Question> questions = generated.questions().stream()
                 .map(item -> Question.builder()
@@ -44,6 +49,7 @@ public class InterviewService {
 
         Interview interview = Interview.builder()
                 .userEmail(userEmail)
+                .resumeId(request.resumeId())
                 .role(request.role())
                 .difficulty(request.difficulty())
                 .status(InterviewStatus.UPCOMING)
@@ -109,6 +115,7 @@ public class InterviewService {
                         .toList();
         return new InterviewResponse(
                 interview.getId(),
+                interview.getResumeId(),
                 interview.getRole(),
                 interview.getDifficulty(),
                 interview.getStatus(),

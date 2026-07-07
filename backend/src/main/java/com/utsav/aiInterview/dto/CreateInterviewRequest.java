@@ -9,6 +9,9 @@ import jakarta.validation.constraints.NotNull;
  */
 public record CreateInterviewRequest(
 
+        @NotBlank(message = "Resume id is required")
+        String resumeId,
+
         @NotBlank(message = "Role is required")
         String role,
 
