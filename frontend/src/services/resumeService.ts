@@ -34,3 +34,8 @@ export async function getResumes(): Promise<ResumeResponse[]> {
   const { data } = await apiClient.get<ApiEnvelope<ResumeResponse[]>>('/resumes')
   return data.data // unwrap the ApiResponse envelope
 }
+
+/** Deletes a resume by id. */
+export async function deleteResume(id: string): Promise<void> {
+  await apiClient.delete<ApiEnvelope<null>>(`/resumes/${id}`)
+}

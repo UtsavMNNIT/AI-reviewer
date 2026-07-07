@@ -1,6 +1,7 @@
 package com.utsav.aiInterview.service;
 
 import com.utsav.aiInterview.dto.AnswerEvaluation;
+import com.utsav.aiInterview.dto.AtsReport;
 import com.utsav.aiInterview.dto.GeneratedQuestion;
 import com.utsav.aiInterview.dto.GeneratedQuestions;
 import com.utsav.aiInterview.dto.ResumeAnalysis;
@@ -95,6 +96,34 @@ public class AIService {
         }
 
         return parseResponse(response, GeneratedQuestions.class);
+    }
+
+    /**
+     * Scores the resume against a target role like an ATS would, returning a 0-100
+     * match score plus the resume's strengths and what to improve for that role.
+     */
+    public AtsReport atsScore(String resumeText, String role) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BadRequestException("Gemini API key is not configured");
+        }
+
+        String url = baseUrl + "/models/" + model + ":generateContent";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(API_KEY_HEADER, apiKey);
+
+        HttpEntity<Map<String, Object>> entity =
+                new HttpEntity<>(buildAtsRequest(resumeText, role), headers);
+
+        String response;
+        try {
+            response = restTemplate.postForObject(url, entity, String.class);
+        } catch (RestClientException ex) {
+            throw new AIServiceException("Failed to call Gemini API", ex);
+        }
+
+        return parseResponse(response, AtsReport.class);
     }
 
     /**
@@ -237,6 +266,48 @@ public class AIService {
                 Resume:
                 %s
                 """.formatted(role, difficulty.name(), resumeText);
+    }
+
+    private Map<String, Object> buildAtsRequest(String resumeText, String role) {
+        Map<String, Object> textPart = Map.of("text", buildAtsPrompt(resumeText, role));
+        Map<String, Object> content = Map.of("parts", List.of(textPart));
+
+        Map<String, Object> stringArray = Map.of("type", "ARRAY", "items", Map.of("type", "STRING"));
+        Map<String, Object> schema = Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        "score", Map.of("type", "INTEGER"),
+                        "summary", Map.of("type", "STRING"),
+                        "strengths", stringArray,
+                        "improvements", stringArray));
+
+        Map<String, Object> generationConfig = Map.of(
+                "responseMimeType", "application/json",
+                "responseSchema", schema);
+
+        return Map.of(
+                "contents", List.of(content),
+                "generationConfig", generationConfig);
+    }
+
+    private String buildAtsPrompt(String resumeText, String role) {
+        return """
+                You are an Applicant Tracking System (ATS) and expert technical recruiter.
+                Score how well the following resume matches the target role on a scale of 0 to 100,
+                based on the relevant skills, technologies, projects and experience the role requires.
+                Be objective and critical — a weak or unrelated resume should score low.
+                Respond ONLY with JSON that matches the requested schema.
+
+                - score: an integer from 0 to 100 rating how well the resume matches the role
+                - summary: a concise 1-2 sentence overall assessment of fit for this role
+                - strengths: the resume's strong points / plus points for this role
+                - improvements: specific things to add or enhance to better match this role
+
+                Role: %s
+
+                Resume:
+                %s
+                """.formatted(role, resumeText);
     }
 
     private Map<String, Object> buildNextQuestionRequest(String resumeText, String role,
