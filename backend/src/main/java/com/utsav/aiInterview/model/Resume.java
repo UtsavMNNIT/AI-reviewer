@@ -29,10 +29,6 @@ public class Resume {
 
     private String originalFilename;
 
-    private String storedFilename;
-
-    private String filePath;
-
     private String contentType;
 
     private long fileSize;
