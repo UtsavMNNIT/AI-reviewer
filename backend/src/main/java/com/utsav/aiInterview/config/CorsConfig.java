@@ -9,6 +9,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * CORS configuration for the frontend client. Allowed origins are configurable
  * via the {@code app.cors.allowed-origins} property (comma-separated) so the
  * deployed frontend URL can be added without a code change.
+ *
+ * <p>Values are treated as origin <em>patterns</em>, so wildcards are supported
+ * (e.g. {@code https://ai-reviewer-resume*.vercel.app} to match Vercel preview
+ * deployments). Patterns are also required here because {@code allowCredentials}
+ * is enabled, which forbids a bare {@code *} wildcard.
  */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
@@ -19,7 +24,7 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins)
+                .allowedOriginPatterns(allowedOrigins)
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
